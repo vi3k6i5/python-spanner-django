@@ -21,8 +21,7 @@ from tests.system.django_spanner.utils import (
 import pytest
 
 
-
-val="2.1"
+val = "2.1"
 from tests.performance.django_spanner.models import Author
 
 
@@ -42,6 +41,8 @@ def measure_execution_time(function):
             measures[function.__name__] = 0
 
     return wrapper
+
+
 def insert_one_row(transaction, one_row):
     """A transaction-function for the original Spanner client.
     Inserts a single row into a database and then fetches it back.
@@ -131,6 +132,7 @@ CREATE TABLE Author (
 @pytest.mark.django_db
 class SpannerBenchmarkTest(BenchmarkTestBase):
     """The original Spanner performace testing class."""
+
     def __init__(self):
         super().__init__()
         self._client = Client()
@@ -161,6 +163,7 @@ class SpannerBenchmarkTest(BenchmarkTestBase):
     def insert_many_rows_with_mutations(self):
         with self._database.batch() as batch:
             batch.insert(
+                id=2,
                 table="Author",
                 columns=("id", "first_name", "last_name", "rating"),
                 values=self._many_rows2,
@@ -185,6 +188,7 @@ class SpannerBenchmarkTest(BenchmarkTestBase):
             if len(rows) != 100:
                 raise ValueError("Wrong number of rows read")
 
+
 @pytest.mark.django_db
 class DjangoBenchmarkTest(BenchmarkTestBase):
     def __init__(self):
@@ -196,8 +200,10 @@ class DjangoBenchmarkTest(BenchmarkTestBase):
         self._many_rows = []
         self._many_rows2 = []
         for i in range(99):
-            self._many_rows.append(Author("Pete", "Allison", val))
-            self._many_rows2.append(Author("Pete", "Allison", val))
+            num = round(random.random() * 1000000)
+            self._many_rows.append(Author(num, "Pete", "Allison", val))
+            num2 = round(random.random() * 1000000)
+            self._many_rows2.append(Author(num2, "Pete", "Allison", val))
 
     def _cleanup(self):
         """Drop the test table."""
@@ -211,7 +217,10 @@ class DjangoBenchmarkTest(BenchmarkTestBase):
     @measure_execution_time
     def insert_one_row_with_fetch_after(self):
         author_kent = Author(
-            first_name="Pete", last_name="Allison", rating=val,
+            id=2,
+            first_name="Pete",
+            last_name="Allison",
+            rating=val,
         )
         author_kent.save()
         last_name = Author.objects.get(pk=author_kent.id).last_name
@@ -257,15 +266,15 @@ def compare_measurements(spanner, django):
 
 measures = []
 for _ in range(50):
-    #spanner_measures = SpannerBenchmarkTest().run()
+    # spanner_measures = SpannerBenchmarkTest().run()
     django_measures = DjangoBenchmarkTest().run()
-    #measures.append((spanner_measures, django_measures))
+    # measures.append((spanner_measures, django_measures))
 
 agg = {"spanner": {}, "django": {}}
 
 for span, djan in measures:
     for key, value in span.items():
-        #agg["spanner"].setdefault(key, []).append(value)
+        # agg["spanner"].setdefault(key, []).append(value)
         agg["django"].setdefault(key, []).append(djan[key])
 
 # spanner_stats = {}
@@ -288,5 +297,3 @@ for key, value in agg["django"].items():
 #     print(key + ":")
 #     print("spanner: ", spanner_stats[key])
 #     print("django: ", django_stats[key])
-    
-
